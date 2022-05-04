@@ -1,3 +1,5 @@
+from ctypes.wintypes import LPCOLORREF
+from operator import ne
 import sys
 #import math
 from math import log
@@ -29,8 +31,10 @@ parser.add_argument("--model", help="Which substitution model should be used. Al
 parser.add_argument("--bLenFactor",help="split branch length by this factor when looking for best child of best node.",  type=float, default=2.0)
 parser.add_argument("--overwrite", help="Overwrite previous results if already present.", action="store_true")
 parser.add_argument("--binaryTree", help="Write output tree as binary.", action="store_true")
-parser.add_argument("--numTopologyImprovements",help="Number of times we traverse the tree loking for topological improvements.",  type=int, default=3)
+parser.add_argument("--numTopologyImprovements",help="Number of times we traverse the tree loking for topological improvements.",  type=int, default=0)
 parser.add_argument("--thresholdTopologyPlacement",help="Don't try to re-place nodes that have current appending logLK cost above this threshold.",  type=float, default=-0.2)
+parser.add_argument("--runOnlyexamples", help="Ignore the input and run it on the example", action="store_true")
+parser.add_argument("--ratevariation", help="Use different substitution rate for each position of the sequence", action="store_true")
 args = parser.parse_args()
 
 onlyNambiguities=args.onlyNambiguities
@@ -53,6 +57,8 @@ thresholdLogLKtopology=args.thresholdLogLKtopology
 bLenFactor=args.bLenFactor
 overwrite=args.overwrite
 binaryTree=args.binaryTree
+runOnlyExample = args.runOnlyexamples
+ratevariation = args.ratevariation
 #improveTopology=args.improveTopology
 numTopologyImprovements=args.numTopologyImprovements
 thresholdTopologyPlacement=args.thresholdTopologyPlacement
@@ -161,7 +167,7 @@ def readConciseAlignment(fileName):
 	print(str(nSeqs)+" sequences in diff file.")
 	return data
 
-runOnlyExample=False
+
 if not runOnlyExample:	
 #read sequence data from file
 	data=readConciseAlignment(inputFile)
@@ -1795,6 +1801,7 @@ def updatePartialsFromTop(node,probVectUp,mutMatrix):
 	# print("Name of children")
 	# print(node.children[0].name)
 	# print(node.children[1].name)
+	# print(bLen)
 	if node.dist>thresholdProb2: #if necessary, update the total probabilities at the mid node.
 		newTot=mergeVectorsUpDown(probVectUp,node.dist/2,node.probVect,node.dist/2,mutMatrix)
 		if newTot==None:
@@ -1808,6 +1815,8 @@ def updatePartialsFromTop(node,probVectUp,mutMatrix):
 		#if node.dist>bLen/2:
 		if node.dist>4*bLen/(bLenFactor+thresholdProb):
 			createFurtherMidNodes(node,probVectUp,bLen)
+		# print("mid-branch")
+		# print(node.probVectTotUp)
 	if len(node.children)==0 and node.dist>thresholdProb2: #if necessary, update the total probability vector at the terminal node.
 		newTot=mergeVectorsUpDown(probVectUp,node.dist,node.probVect,0.0,mutMatrix)
 		if newTot==None:
@@ -1818,6 +1827,7 @@ def updatePartialsFromTop(node,probVectUp,mutMatrix):
 			return
 		newTot=shorten(newTot)
 		node.probVectTot=newTot
+
 	elif len(node.children)>0: #at valid internal node, update upLeft and upRight, and if necessary pass the function on to children.
 		child0Vect=node.children[0].probVect
 		child1Vect=node.children[1].probVect
@@ -1845,6 +1855,7 @@ def updatePartialsFromTop(node,probVectUp,mutMatrix):
 			# exit()
 			newUpRight =shorten(newUpRight)
 			node.probVectUpRight=newUpRight
+
 			if node.dist>thresholdProb2:
 				newTot=mergeVectorsUpDown(newUpRight,0.0,child0Vect,dist0,mutMatrix)
 				if newTot==None:
@@ -1853,6 +1864,7 @@ def updatePartialsFromTop(node,probVectUp,mutMatrix):
 				newTot =shorten(newTot)
 				node.probVectTot=newTot
 				updatedTot=True
+
 			updatePartialsFromTop(node.children[0],newUpRight,mutMatrix)
 		if areVectorsDifferent(node.probVectUpLeft,newUpLeft):
 			# print("Vectors up left are different")
@@ -2781,7 +2793,7 @@ def appendProbNode(probVectP,probVectC,bLen,mutMatrix):
 							tot+=tot2*(entry2[4][i] + bLen15*(mutMatrix[i][0]*entry2[4][0]+mutMatrix[i][1]*entry2[4][1]+mutMatrix[i][2]*entry2[4][2]+mutMatrix[i][3]*entry2[4][3]))
 						totalFactor*=(tot/rootFreqs[i1])
 				else:
-						tot=0.0
+						tot=0.0 
 						for j in range4:
 								tot+=mutMatrix[i1][j]*entry2[4][j]
 						tot*=(bLen+entry1[3]+entry2[3])
@@ -4433,6 +4445,7 @@ if runOnlyExample:
 	print(data)
 	print(ref[:10])
 	samples=data.keys()
+	lRef = 15
 	#for i in range(10):
 	#	print(data[i])
 	#exit()
@@ -4525,17 +4538,656 @@ if runOnlyExample:
 	# 	print(createNewick(newNode))
 	# 	print(newNode.probVect)
 	# exit()
-	print("Now making change to the tree to create imperfection. Moving")
-	nodeToReplace=t1.children[1].children[0].children[0].children[1]
-	destination=t1.children[0].children[1].children[1]
-	newickString=createNewick(nodeToReplace)
-	print(newickString)
-	print("to")
-	newickString=createNewick(destination)
-	print(newickString)
-	cutAndPasteNode(nodeToReplace,destination,False,bLen,0.0001,-100.0,mutMatrix)
-	newickString=createNewick(t1)
-	print(newickString)
+	# print("Now making change to the tree to create imperfection. Moving")
+	# nodeToReplace=t1.children[1].children[0].children[0].children[1]
+	# destination=t1.children[0].children[1].children[1]
+	# newickString=createNewick(nodeToReplace)
+	# print(newickString)
+	# print("to")
+	# newickString=createNewick(destination)
+	# print(newickString)
+	# cutAndPasteNode(nodeToReplace,destination,False,bLen,0.0001,-100.0,mutMatrix)
+	# newickString=createNewick(t1)
+	# print(newickString)
+
+####################
+#  SEGMENTS COMPLETED BY ABHRO:
+####################
+
+# Tarversal before updating:
+
+
+def traversal(node):
+	included = [] 
+	while node!= None:
+		if len(node.children)>0:
+			if len(included)>0 and included[-1]==node.children[1]:
+				included.append(node)
+				node=node.up
+			elif node.children[0] in included:
+				node = node.children[1]
+			else:
+				node = node.children[0]
+		else:
+			included.append(node)
+			node = node.up
+	print("The number of nodes traversed")
+	print(len(included))	
+	for node in included:
+		if hasattr(node, 'probVectTot'):
+			print("the old upper likelihood")
+			print(node.probVectTot)	
+		if hasattr(node, 'probVectUpRight'):
+			print("the old upper right likelihood")
+			print(node.probVectUpRight)	
+		if hasattr(node, 'probVectUpLeft'):
+			print("the old upper left likelihood")
+			print(node.probVectUpLeft)	
+		if hasattr(node, 'probVectTotUp'):
+			print("the old midbranch likelihood")
+			print(node.probVectTotUp)	
+
+# This function Updates the lower Likelihood of each and every node:
+
+def update_lower_lks(root):
+	node = root
+	visited = []
+
+	# print("The mutMatrix Involved before:")
+	# print(mutMatrix)
+	# mutMatrix = [[-0.31839412870617434-0.05, 0.03979926608827179+0.05, 0.19899633044135898, 0.07959853217654358], [0.1296575835653992+0.05, -2.7876380466560824-0.05, 0.0648287917826996, 2.5931516713079836], [0.30341510751640355, 0.12136604300656142+0.05, -1.6384415805885792-0.05, 1.2136604300656142], [0.07415759885281611, 0.11123639827922419+0.05, 0.03707879942640806, -0.22247279655844837-0.05]]
+	# print("the mutMatrix Involved after:")
+	# print(mutMatrix)
+	while node!= None:
+		if not terminal_node(node):
+			if len(visited)>0 and visited[-1] == node.children[1]:
+				childDist = node.children[0].dist
+				otherChildDist = node.children[1].dist
+				#initial_partials.append(node.probVect)
+				# print("old vector:")
+				# print(node.probVect)
+				newvect = mergeVectors(node.children[0].probVect,childDist, node.children[1].probVect, otherChildDist, mutMatrix)
+				node.probVect = newvect
+				# print("new vector:")
+				# print(node.probVect)
+				final_partials.append(node.probVect)
+				visited.pop()
+				visited.pop()
+				visited.append(node)
+				# if node.up!=None and node == node.up.children[0]:
+				# 	if node.up.children[1] not in visited:
+				# 		print("I am the left child and an internal node ")
+				# 	else:
+				# 		print("I am the left child and an internal node , right sibling visited")	
+				# elif node.up!=None and node == node.up.children[1]:
+				# 	if node.up.children[0] not in visited:
+				# 		print("I am the right child and an internal node ")
+				# 	else:
+				# 		print("I am the right child and an internal node , left sibling visited")					
+				# elif node.up == None:
+				# 	print("I am the root")
+				node = node.up	
+			elif node.children[0] in visited:
+				node= node.children[1]
+			else:
+				node = node.children[0]
+		else:
+			# if node == node.up.children[0]:
+			# 	if node.up.children[1] not in visited:
+			# 		print("I am the left child ")
+			# 	else:
+			# 		print("I am the left child and an internal node , right sibling visited")	
+
+			# else:
+				# if node.up.children[1] not in visited:
+				# 	print("I am the right child  ")
+				# else:
+				# 	print("I am the right child, right sibling visited")	
+			visited.append(node)
+			node = node.up
+
+# This function updates Upperleft, Upperright and total likelihood of each and every node:
+
+def update_up_upleft_upright_lk(root):
+	node = root
+	tovisits = []
+	tovisits.append(node)
+	while tovisits :
+		node = tovisits.pop()
+		if node.up == None:
+			rV=rootVector(node.probVect,rootFreqs,0.0)
+			if areVectorsDifferent(node.probVectTot,rV):
+				print("the root is visited and upper lk updated")
+				node.probVectTot=rV
+			if not terminal_node(node):
+				newUpLeftVect = rootVector(node.children[0].probVect,rootFreqs,node.children[0].dist)
+				newUpRightVect = rootVector(node.children[1].probVect,rootFreqs,node.children[1].dist)
+				# if areVectorsDifferent(node.probVectUpLeft,newUpLeftVect):
+				print("The upleft of root updated")
+				node.probVectUpLeft = newUpLeftVect
+				# if areVectorsDifferent(node.probVectUpRight,newUpRightVect):
+				print("The upright of root updated")
+				node.probVectUpRight = newUpRightVect
+				tovisits.append(node.children[0])
+				tovisits.append(node.children[1])
+		else:
+			if node == node.up.children[0]:
+				# if node.up.up ==  None:
+				# 	print("left child of root visited and upper lk updated")
+				# elif node.up.up.up == None:
+				# 	print("left child of root's child is visited and upper lk updated")
+				# else:
+				# 	print("left child is visited and upper lk updated")
+				newTot = mergeVectorsUpDown(node.up.probVectUpRight,node.dist,node.probVect,0.0,mutMatrix)
+				node.probVectTot=newTot
+				if not terminal_node(node):
+					newUpLeftVect = mergeVectorsUpDown(node.up.probVectUpRight,node.dist,node.children[0].probVect,node.children[0].dist,mutMatrix)
+					newUpRightVect = mergeVectorsUpDown(node.up.probVectUpRight,node.dist,node.children[1].probVect,node.children[1].dist,mutMatrix)
+					# if areVectorsDifferent(node.probVectUpRight,newUpRightVect):
+					# print("left child and upright/left lk updated")
+					node.probVectUpRight=newUpRightVect
+					# if areVectorsDifferent(node.probVectUpLeft,newUpLeftVect):
+					node.probVectUpLeft=newUpLeftVect
+					tovisits.append(node.children[0])
+					tovisits.append(node.children[1])
+					if node.dist>thresholdProb2: #if necessary, update the total probabilities at the mid node.
+						newTot = mergeVectorsUpDown(node.up.probVectUpRight,node.dist/2,node.probVect,node.dist/2,mutMatrix)
+						if newTot == None:
+							updateBLen(node.up, 0, bLen, mutMatrix)
+						newTot=shorten(newTot)
+						# if areVectorsDifferent(node.probVectTotUp,newTot):
+						node.probVectTotUp=newTot
+						# print("left child and new mid branch lk updated")
+					#if node.dist>bLen/2:
+						if node.dist>4*bLen/(bLenFactor+thresholdProb):
+							createFurtherMidNodes(node,node.up.probVectUpRight,bLen)
+				else:
+					if node.dist>thresholdProb2:
+						newTot = mergeVectorsUpDown(node.up.probVectUpRight,node.dist/2,node.probVect,node.dist/2,mutMatrix)
+						if newTot == None:
+							updateBLen(node.up, 1, bLen, mutMatrix)
+						else:
+							# if areVectorsDifferent(node.probVectTotUp,newTot):
+							# print("left child terminal node and mid-branch lk updated")
+							newTot=shorten(newTot)
+							node.probVectTotUp=newTot
+						#if node.dist>bLen/2:
+							if node.dist>4*bLen/(bLenFactor+thresholdProb):
+								createFurtherMidNodes(node,node.up.probVectUpLeft,bLen)	
+			if node == node.up.children[1]:
+				newTot = mergeVectorsUpDown(node.up.probVectUpLeft,node.dist,node.probVect,0.0,mutMatrix)
+				# if areVectorsDifferent(newTot, node.probVectTot):
+				# if node.up.up ==  None:
+				# 	print("right child of root visited and upper lk updated")
+				# elif node.up.up.up == None:
+				# 	print("right child of root's child is visited and upper lk updated")
+				# else:
+				# 	print("right child is visited and upper lk updated")
+				node.probVectTot = newTot
+				if not terminal_node(node):
+					newUpLeftVect = mergeVectorsUpDown(node.up.probVectUpLeft, node.dist, node.children[0].probVect, node.children[0].dist,mutMatrix)
+					newUpRightVect = mergeVectorsUpDown(node.up.probVectUpLeft, node.dist, node.children[1].probVect, node.children[1].dist,mutMatrix)
+					# if areVectorsDifferent(newUpLeftVect,node.probVectUpLeft):
+					# print("right child visited and upright/upleft lk updated")
+					node.probVectUpLeft = newUpLeftVect
+					# if areVectorsDifferent(newUpRightVect,node.probVectUpRight):	
+					node.probVectUpRight = newUpRightVect				
+					tovisits.append(node.children[0])
+					tovisits.append(node.children[1])
+					if node.dist>thresholdProb2: #if necessary, update the total probabilities at the mid node.
+						newTot = mergeVectorsUpDown(node.up.probVectUpLeft,node.dist/2,node.probVect,node.dist/2,mutMatrix)
+						if newTot == None:
+							updateBLen(node.up, 1, bLen, mutMatrix)
+						else:
+							# if areVectorsDifferent(newTot,node.probVectTotUp):
+							# print("right child visited and mid branch lk updated")
+							newTot = shorten(newTot)
+							node.probVectTotUp=newTot
+						#if node.dist>bLen/2:
+							if node.dist>4*bLen/(bLenFactor+thresholdProb):
+								createFurtherMidNodes(node,node.up.probVectUpLeft,bLen)
+				else:
+					if node.dist>thresholdProb2:
+						newTot = mergeVectorsUpDown(node.up.probVectUpLeft,node.dist/2,node.probVect,node.dist/2,mutMatrix)
+						if newTot == None:
+							updateBLen(node.up, 1, bLen, mutMatrix)
+							# print("right child visited and newtot none")
+
+						else:
+							# if areVectorsDifferent(newTot,node.probVectTotUp):
+							# print("right child terminal node and midbranch lk updated")
+							newTot=shorten(newTot)
+							node.probVectTotUp=newTot
+					#if node.dist>bLen/2:
+						if node.dist>4*bLen/(bLenFactor+thresholdProb):
+							createFurtherMidNodes(node,node.up.probVectUpLeft,bLen)		
+
+# Function finding the likelihood of the entire tree give the data with a unchanged substitution rate for all sites.
+
+def entire_tree_lk(root,mutMatrix):
+	node = root
+	visit =[]
+	totlk = 0.0
+	while node!= None:
+		if not terminal_node(node):
+			if len(visit)>0 and visit[-1] == node.children[1]:
+				childDist = node.children[0].dist
+				otherChildDist = node.children[1].dist
+				newVect,loglk = mergeVectorsRoot(node.children[0].probVect,childDist, node.children[1].probVect, otherChildDist, mutMatrix)
+				node.probVect = newVect
+				totlk = totlk+loglk
+				visit.pop()
+				visit.pop()
+				visit.append(node)
+				node = node.up	
+			elif node.children[0] in visit:
+				node= node.children[1]
+			else:
+				node = node.children[0]
+		else:
+			visit.append(node)
+			node = node.up
+	return totlk
+
+# Introducing rate variation
+
+# This part is dedicated to updating the substitution rate matrix by taking into occurence the number and kind of mutation per sites
+
+# This function updates the site wise number and kind of mutations
+
+def not_over_counting(PartVect):
+	if PartVect[3] < thresholdProb4:
+		return True
+
+def differentiate_vects(Vect1,Vect2,Pseudo_Count_Matrix):
+	indexEntry1 = 0
+	indexEntry2 = 0
+	pos = 1
+	entry1 = Vect1[indexEntry1]
+	pos1 = entry1[1]
+	if entry1[0]!="N" and entry1[0]!= "R":
+		end1 = pos1
+	else:
+		end1 = pos1 + entry1[2]-1
+	entry2=Vect2[indexEntry2]
+	pos2=entry2[1]
+	if entry2[0]!="N" and entry2[0]!="R":
+		end2=pos2
+	else:
+		end2=pos2+entry2[2]-1
+	end=end1
+	if end2<end:
+		end=end2
+	length=end+1-pos
+	while True:
+		if not_over_counting(entry1):
+			if entry1[0]=="R":
+				if entry2[0]!="R" and entry2[0]!="N" and entry2[0]!="O":
+					i1=allelesLow[ref[pos-1]]
+					i2=alleles[entry2[0]]
+					Pseudo_Count_Matrix[pos-1][i1][i2]+=1
+							
+			elif entry1[0]!="O" and entry1[0]!="N":
+				if entry2[0]=="R":
+					i1=alleles[entry1[0]]
+					i2=allelesLow[ref[pos-1]]
+					Pseudo_Count_Matrix[pos-1][i1][i2]+=1
+				elif entry2[0]!="N" and entry2[0]!="O":
+					if entry1[0]!= entry2[0]:
+						i1=alleles[entry1[0]]
+						i2=alleles[entry2[0]]
+						Pseudo_Count_Matrix[pos-1][i1][i2]+=1
+		#update pos, end, etc
+		pos+=length
+		if pos>lRef:
+			break
+		if pos>end1:
+			indexEntry1+=1
+			entry1=Vect1[indexEntry1]
+			pos1=entry1[1]
+			if entry1[0]!="N" and entry1[0]!="R":
+				end1=pos1
+			else:
+				end1=pos1+entry1[2]-1
+		if pos>end2:
+			indexEntry2+=1
+			entry2=Vect2[indexEntry2]
+			pos2=entry2[1]
+			if entry2[0]!="N" and entry2[0]!="R":
+				end2=pos2
+			else:
+				end2=pos2+entry2[2]-1
+		end=end1
+		if end2<end:
+			end=end2
+		length=end+1-pos	
+
+def differentiate_vects_root(Vect1,Vect2, d1, d2, Pseudo_Count_Matrix):
+	indexEntry1 = 0
+	indexEntry2 = 0
+	pos = 1
+	entry1 = Vect1[indexEntry1]
+	pos1 = entry1[1]
+	if entry1[0]!="N" and entry1[0]!= "R":
+		end1 = pos1
+	else:
+		end1 = pos1 + entry1[2]-1
+	entry2=Vect2[indexEntry2]
+	pos2=entry2[1]
+	if entry2[0]!="N" and entry2[0]!="R":
+		end2=pos2
+	else:
+		end2=pos2+entry2[2]-1
+	end=end1
+	if end2<end:
+		end=end2
+	length=end+1-pos
+	while True:
+		# if not not_over_counting(entry1) and not not_over_counting(entry2):
+		if entry1[0]=="R":
+			if entry2[0]!="R" and entry2[0]!="N" and entry2[0]!="O":
+				i1=allelesLow[ref[pos-1]]
+				i2=alleles[entry2[0]]
+				k = rootFreqs[i1]*(d1+entry1[3])/(rootFreqs[i1]*(d1+entry1[3])+rootFreqs[i2]*(d2+entry2[3]))
+				m = rootFreqs[i2]*(d2+entry2[3])/(rootFreqs[i1]*(d1+entry1[3])+rootFreqs[i2]*(d2+entry2[3]))
+				Pseudo_Count_Matrix[pos-1][i1][i2]+=k
+				Pseudo_Count_Matrix[pos-1][i2][i1]+=m		
+		elif entry1[0]!="O" and entry1[0]!="N":
+			if entry2[0]=="R":
+				i1=alleles[entry1[0]]
+				i2=allelesLow[ref[pos-1]]
+				k = rootFreqs[i1]*(d1+entry1[3])/(rootFreqs[i1]*(d1+entry1[3])+rootFreqs[i2]*(d2+entry2[3]))
+				m = rootFreqs[i2]*(d2+entry2[3])/(rootFreqs[i1]*(d1+entry1[3])+rootFreqs[i2]*(d2+entry2[3]))
+				Pseudo_Count_Matrix[pos-1][i1][i2]+=k
+				Pseudo_Count_Matrix[pos-1][i2][i1]+=m	
+			elif entry2[0]!="N" and entry2[0]!="O":
+				if entry1[0]!= entry2[0]:
+					i1=alleles[entry1[0]]
+					i2=alleles[entry2[0]]
+					k = rootFreqs[i1]*(d1+entry1[3])/(rootFreqs[i1]*(d1+entry1[3])+rootFreqs[i2]*(d2+entry2[3]))
+					m = rootFreqs[i2]*(d2+entry2[3])/(rootFreqs[i1]*(d1+entry1[3])+rootFreqs[i2]*(d2+entry2[3]))
+					Pseudo_Count_Matrix[pos-1][i1][i2]+=k
+					Pseudo_Count_Matrix[pos-1][i2][i1]+=m	
+
+		#update pos, end, etc
+		pos+=length
+		if pos>lRef:
+			break
+		if pos>end1:
+			indexEntry1+=1
+			entry1=Vect1[indexEntry1]
+			pos1=entry1[1]
+			if entry1[0]!="N" and entry1[0]!="R":
+				end1=pos1
+			else:
+				end1=pos1+entry1[2]-1
+		if pos>end2:
+			indexEntry2+=1
+			entry2=Vect2[indexEntry2]
+			pos2=entry2[1]
+			if entry2[0]!="N" and entry2[0]!="R":
+				end2=pos2
+			else:
+				end2=pos2+entry2[2]-1
+		end=end1
+		if end2<end:
+			end=end2
+		length=end+1-pos	
+
+def vect_choice(node):
+	if node == node.up.children[0]:
+		Vect = node.up.probVectUpRight
+	else:
+		Vect = node.up.probVectUpLeft
+	return Vect
+
+def list_update(list,node):
+	list.pop()
+	list.append(node)
+
+def query_print(n1,n2,Pseudo_Count_Matrix):
+	if terminal_node(n2):
+		print(n1)
+		print(n2)
+		print(Pseudo_Count_Matrix)
+
+def terminal_node(n):
+	if len(n.children)==0:
+		return True
+
+def anomaly_print(n1,n2,p1,p2,Pseudo_Count_Matrix):
+	if terminal_node(n2):
+		count = 0
+		for i in range(len(Pseudo_Count_Matrix)):
+			for j in range(len(Pseudo_Count_Matrix[i])):
+				for k in range(len(Pseudo_Count_Matrix[i][j])):
+					if Pseudo_Count_Matrix[i][j][k] > 1:
+						count+=1
+		if count>0:
+			print(p1)
+			print('')
+			print(n1)
+			print('')
+			print(Pseudo_Count_Matrix)
+			print('')
+			print(p2)
+			print('')
+			print(n2)
+			print('')
+
+def updatePseudoCounts_entire_tree(root):
+	node = root
+	visited = []
+	pseudoCounts_positional = []
+	for i in range(lRef):
+		pseudoCounts_positional.append([[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]])
+	visited.append(node)
+	while node!= None:
+		if not terminal_node(node):
+			if len(visited)>0 and visited[-1] == node.children[1]:
+				node1 = node.children[1]
+				if node.up!= None:
+					probVect1 = vect_choice(node1)
+					probVect2 = node1.probVect
+					differentiate_vects(probVect1,probVect2,pseudoCounts_positional)
+				list_update(visited,node)
+				node = node.up
+			elif node.children[0] in visited:
+				node1 = node.children[0]
+				if node.up != None:
+					probVect1 = vect_choice(node1)
+					probVect2 = node1.probVect
+					differentiate_vects(probVect1,probVect2, pseudoCounts_positional)
+				else:
+					probVect1 = node1.probVect
+					dist1 = node1.dist
+					probVect2 = node.children[1].probVect
+					dist2 = node.children[1].dist
+					differentiate_vects_root(probVect1,probVect2, dist1, dist2, pseudoCounts_positional)
+				visited.pop()			
+				node = node.children[1]	
+			else:
+				node = node.children[0]
+		else:
+			visited.append(node)
+			node = node.up
+	return pseudoCounts_positional
+
+# This function traverse and keep track of how long a site is in what state
+
+def tree_length(root):
+	node = root
+	tree_visited = []
+	treelength = 0.0
+	while node!= None:
+		if not terminal_node(node):
+			if len(tree_visited)>0 and tree_visited[-1] == node.children[1]:
+				dist1 = node.children[1].dist
+				treelength+=dist1
+				list_update(tree_visited,node)
+				node = node.up
+			elif node.children[0] in tree_visited:
+				dist2 = node.children[0].dist
+				tree_visited.pop()			
+				node = node.children[1]	
+				treelength+=dist2
+			else:
+				node = node.children[0]
+		else:
+			tree_visited.append(node)
+			node = node.up
+	return treelength
+
+def ref_seq_state_count(root):
+	leng = tree_length(root)
+	states =[]
+	for i in range(lRef):
+		states.append([0.0,0.0,0.0,0.0])
+	for i in range(lRef):
+		i1=allelesLow[ref[i]]
+		states[i][i1]+=leng
+	return states
+
+def update_state_count(Vect1, Vect2, d1, state_count):
+	indexEntry1 = 0
+	indexEntry2 = 0
+	pos = 1
+	entry1 = Vect1[indexEntry1]
+	pos1 = entry1[1]
+	if entry1[0]!="N" and entry1[0]!= "R":
+		end1 = pos1
+	else:
+		end1 = pos1 + entry1[2]-1
+	entry2=Vect2[indexEntry2]
+	pos2=entry2[1]
+	if entry2[0]!="N" and entry2[0]!="R":
+		end2=pos2
+	else:
+		end2=pos2+entry2[2]-1
+	end=end1
+	if end2<end:
+		end=end2
+	length=end+1-pos
+	while True:
+		if entry1[0]!="R":
+			if entry2[0]!="R":
+				if entry1[0]!="N" and entry1[0]!="O" and entry2[0]!="O" and entry2[0]!="N":
+					i1=allelesLow[ref[pos-1]]
+					i2=alleles[entry1[0]]
+					state_count[pos-1][i1]-= d1
+					state_count[pos-1][i2]+= d1
+				if entry1[0] == "N" or entry1[0] == "O" or entry2[0] == "N" or entry2[0] == "O":
+					for i in range(length): 
+						i1 = allelesLow[ref[pos-1+i]]
+						state_count[pos-1+i][i1] -= d1				
+			else:
+				if entry1[0] != "N" and entry1[0] != "O":
+					i1 = allelesLow[ref[pos-1]]
+					i2 = alleles[entry1[0]]
+					state_count[pos-1][i1]-= d1
+					state_count[pos-1][i2]+= d1
+				if entry1[0] == "N" or entry1[0] =="O":
+					for i in range(length):
+						i1 = allelesLow[ref[pos-1+i]]
+						state_count[pos-1+i][i1]-= d1
+		#update pos, end, etc
+		pos+=length
+		if pos>lRef:
+			break
+		if pos>end1:
+			indexEntry1+=1
+			entry1=Vect1[indexEntry1]
+			pos1=entry1[1]
+			if entry1[0]!="N" and entry1[0]!="R":
+				end1=pos1
+			else:
+				end1=pos1+entry1[2]-1
+		if pos>end2:
+			indexEntry2+=1
+			entry2=Vect2[indexEntry2]
+			pos2=entry2[1]
+			if entry2[0]!="N" and entry2[0]!="R":
+				end2=pos2
+			else:
+				end2=pos2+entry2[2]-1
+		end=end1
+		if end2<end:
+			end=end2
+		length=end+1-pos
+
+def get_state_count(root):
+	states = ref_seq_state_count(root)
+	node_visited = []
+	node = root
+	while node!= None:
+		if not terminal_node(node):
+			if len(node_visited)>0 and node_visited[-1] == node.children[1]:
+				dist1 = node.children[1].dist
+				update_state_count(node.probVectUpLeft, node.children[1].probVect, dist1, states)
+				list_update(node_visited,node)
+				node = node.up
+			elif len(node_visited)>0 and node_visited[-1] == node.children[0]:
+				dist2 = node.children[0].dist
+				update_state_count(node.probVectUpRight, node.children[0].probVect, dist2, states)
+				node_visited.pop()			
+				node = node.children[1]	
+			else:
+				node = node.children[0]
+		else:
+			node_visited.append(node)
+			node = node.up
+	return states
+
+# This function normalises the mutation matrices to obtain the rate of substitution at each and every site
+
+def sitewiserate(root,mutMatrix):
+	mut_per_site_kind = updatePseudoCounts_entire_tree(root)
+	state_Mtrix_per_site = get_state_count(root)
+	obs_mut_per_site = []
+	for i in range(len(mut_per_site_kind)):
+		s = 0
+		for j in range(len(mut_per_site_kind[i])):
+			k = sum(mut_per_site_kind[i][j])
+			s+=k
+		obs_mut_per_site.append(s)
+	Q_diag = []
+	for i in range(len(mutMatrix)):
+		Q_diag.append(mutMatrix[i][i]) 
+	exp_mut_per_site = []
+	for i in range(lRef):
+		each_site = []
+		for j in range(len(state_Mtrix_per_site[i])):
+			site_nucl = []
+			site_nucl = -Q_diag[j]*state_Mtrix_per_site[i][j]
+			each_site.append(site_nucl)
+		exp_mut_per_site.append(sum(each_site))
+	normalising_factor = []
+	for i in range(lRef):
+		n = obs_mut_per_site[i]/exp_mut_per_site[i]
+		normalising_factor.append(n)
+	k = sum(normalising_factor)
+	for i in range(len(normalising_factor)):
+		normalising_factor[i] = (normalising_factor[i]*lRef)/k
+	return normalising_factor
+
+root = t1
+if ratevariation:
+	mutMatrixVariation = []
+	rate_each_site = sitewiserate(root,mutMatrix)
+	for i in range(lRef):
+		multiplied_list = []
+		for j in range(len(mutMatrix)):
+			multiplied_list.append([element * rate_each_site[i] for element in mutMatrix[j]])
+		mutMatrixVariation.append(multiplied_list)
+
+# print("this is")
+# print(get_state_count(root))
+# print(updatePseudoCounts_entire_tree(root))
+# print(sitewiserate(root,mutMatrix))
+# print(mutMatrixVariation)
+
+
+
 
 #if improveTopology:
 #setAllDirty(t1)
