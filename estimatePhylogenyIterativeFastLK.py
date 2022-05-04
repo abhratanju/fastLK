@@ -67,10 +67,20 @@ example=False
 minimumCarryOver=sys.float_info.min*(1e50)
 
 if os.path.isfile(outputFile+"_tree.tree")  and (not overwrite):
-	print("File "+outputFile+"_tree.tree already exists, quitting fastLK tree inference. Use option --overwrite if you want to overwirte previous inference.")
+	print("File "+outputFile+"_tree.tree already exists, quitting MAPLE tree inference. Use option --overwrite if you want to overwirte previous inference.")
 	exit()
-
-
+if not os.path.isfile(inputFile):
+	print("Input file in Maple format "+inputFile+" not found, quitting MAPLE tree inference. Use option --input to specify a valid input file.")
+	exit()
+if not os.path.isfile(refFile):
+	print("Input reference fasta file "+refFile+" not found, quitting MAPLE tree inference. Use option --reference to specify a valid input reference file.")
+	exit()
+lineSplit=outputFile.split("/")
+lineSplit[-1]=""
+outFolder="/".join(lineSplit)
+if not os.path.isdir(outFolder):
+	print("Path to output file "+outFolder+" does not exist, quitting MAPLE tree inference. Use option --output to specify a valid output file path and output file name.")
+	exit()
 
 class Tree(object):
 	def __init__(self, name='', children=None, dist=1.0):
@@ -4298,14 +4308,14 @@ def startTopologyUpdates(node,bLen,mutMatrix):
 	return newRoot,totalImprovement
 
 #set all descendant nodes to dirty
-def setAllDirty(node):
-	nextLeaves=[node]
-	#node.dirty=True
-	while len(nextLeaves)>0:
-		nextNode=nextLeaves.pop()
-		nextNode.dirty=True
-		for c in nextNode.children:
-			nextLeaves.append(c)
+# def setAllDirty(node):
+# 	nextLeaves=[node]
+# 	#node.dirty=True
+# 	while len(nextLeaves)>0:
+# 		nextNode=nextLeaves.pop()
+# 		nextNode.dirty=True
+# 		for c in nextNode.children:
+# 			nextLeaves.append(c)
 			#setAllDirty(c)
 
 def createNewick(node):
@@ -4475,6 +4485,7 @@ numSamples=0
 for d in distances:
 	numSamples+=1
 	sample=d[1]
+	#print(sample)
 	newPartials=probVectTerminalNode(data[sample],0.0)
 	# if runOnlyExample:
 	# 	print("Placing sample "+sample)
